@@ -1,0 +1,16 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+
+/* This file is for your main application CSS */
+.chessboard {
+  display: flex;
+  flex-direction: column;
+  width: 800px;
+  gap: 0px; /* or use Tailwind gap-0 */
+}
+
+.row {
+  display: flex;
+}
