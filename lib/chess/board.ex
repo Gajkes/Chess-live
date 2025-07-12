@@ -19,6 +19,15 @@ defmodule Chess.Board do
     {:ok, %Board{squares: Map.new(squares_after_move)}}
   end
 
+  def apply_moves(board, moves) do
+    Enum.reduce_while(moves, {:ok, board}, fn move, {:ok, acc_board} ->
+      case apply_move(acc_board, move) do
+        {:ok, new_board} -> {:cont, {:ok, new_board}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
   defp remove_piece(squares, %Move{from: {row_from, col_from}} = move) do
     case  Map.get_and_update(squares, {row_from, col_from}, fn current ->
       {current, %Square{current | piece: nil}}

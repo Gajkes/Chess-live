@@ -39,4 +39,16 @@ defmodule Chess.Pieces.PiecesLib do
   # def valid_squares(path) do
   #   Enum.filter(path, fn {r, c_index} -> r in 1..8 and c_index in 0..7 end)
   # end
+  def square_attacked?(target_pos, %Chess.Board{squares: squares} = board, attacker_color) do
+    Enum.any?(squares, fn
+      {_pos, %Chess.Square{piece: nil}} -> false
+      {_pos, %Chess.Square{piece: p} = square} ->
+        color_of(p) == attacker_color and
+          Enum.any?(Chess.Piece.attacks(square, board), fn
+            %Chess.Move{to: ^target_pos} -> true
+            _ -> false
+          end)
+    end)
+  end
+
 end

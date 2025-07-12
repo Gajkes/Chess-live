@@ -44,8 +44,8 @@ defmodule Chess.Pieces.King do
     when (color == :black and king_piece == :K) or
         (color == :white and king_piece == :k) do
     [
-      castle_option(row, {row, :h}, [:f, :g], {row, :g}, :castle_kingside, color, squares),
-      castle_option(row, {row, :a}, [:d, :c, :b], {row, :c}, :castle_queenside, color, squares)
+      castle_option(row, {row, :h}, [:f, :g], {row, :g}, :kingside, color, squares),
+      castle_option(row, {row, :a}, [:d, :c, :b], {row, :c}, :queenside, color, squares)
     ]
     |> Enum.filter(& &1)
   end

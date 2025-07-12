@@ -7,7 +7,7 @@ defmodule Chess.Move do
             piece: nil,
             capture: nil,
             # promotion: nil,
-            castle: false
+            castle: nil
             # checking: nil
 
 

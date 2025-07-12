@@ -23,9 +23,9 @@ defmodule Chess.Game do
 
     with :ok <- validate_turn(turn, move),
          {:ok, move} <- resolve_move(square_from, move, board),
-         :ok <- validate_special(move, board, turn, history),
-         :ok <- king_safe?(move, board, turn),
-         {:ok, new_board} <- Board.apply_move(board, move)
+         {:ok, moves} <- validate_special(move, board, turn, history),
+         :ok <- king_safe_all?(moves, board, turn),
+         {:ok, new_board} <- Board.apply_moves(board, moves)
 
          do
           %Game{
@@ -51,7 +51,7 @@ defmodule Chess.Game do
   defp opposite(:white), do: :black
   defp opposite(:black), do: :white
 
-  defp resolve_move(square_from, %Move{from: from, to: to}, board) do
+  defp resolve_move(square_from = %Square{piece: piece}, %Move{from: from, to: to}, board) do
     all_moves =
       [&Piece.moves/2, &Piece.attacks/2]
       |> Enum.flat_map(fn check_fun -> check_fun.(square_from, board) end)
@@ -59,22 +59,23 @@ defmodule Chess.Game do
     IO.inspect(all_moves, label: "all generated legal moves")
 
     case Enum.find(all_moves, fn %Move{from: ^from, to: ^to} -> true; _ -> false end) do
-      nil -> {:error, :illegal_move}
-      move -> {:ok, move}
+      nil ->
+        IO.puts("resolve_move {:error, :illegal_move}")
+        {:error, :illegal_move}
+      move ->
+        updated_move = %Move{move | piece: piece}
+        IO.inspect(updated_move, label: "resolve_move {:ok, move}")
+        {:ok, updated_move}
     end
   end
 
 
-  defp king_safe?(%Move{} = move, %Board{} = board, color) do
-    case Board.apply_move(board, move) do
+  defp king_safe_all?(moves, board, color) do
+    case Board.apply_moves(board, moves) do
       {:ok, new_board} ->
-        case not king_in_check?(new_board, color) do
-          true -> :ok
-          false -> {:error, :king_in_check}
-        end
+        if king_in_check?(new_board, color), do: {:error, :king_in_check}, else: :ok
 
-      {:error, reason} ->
-        {:error,reason}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -82,32 +83,82 @@ defmodule Chess.Game do
   defp king_in_check?(%Board{squares: squares} = board, color) do
     king_piece = if color == :white, do: :k, else: :K
 
-    king_pos =
-      Enum.find_value(squares, fn {pos, %Square{piece: p}} ->
-        if p == king_piece, do: pos, else: nil
-      end)
-
-    Enum.any?(squares, fn
-      {_pos, %Square{piece: nil}} -> false
-      {_pos, %Square{piece: p} = square} ->
-        PiecesLib.color_of(p) != color and
-          Enum.any?(Piece.attacks(square, board), fn
-            %Move{to: ^king_pos} -> true
-            _ -> false
-          end)
-    end)
+    case Enum.find_value(squares, fn {pos, %Square{piece: p}} ->
+      if p == king_piece, do: pos, else: nil
+    end) do
+    nil -> false
+    king_pos -> PiecesLib.square_attacked?(king_pos, board, opposite(color))
+ end
   end
 
-  defp validate_special(%Move{castle: side} = move, board, turn, history) when not is_nil(side) do
-    validate_castling(move, board, turn, history)
+  defp validate_special(move, board, turn, history)  do
+    case resolve_special(move, board, turn, history) do
+      {:ok, moves} -> {:ok, moves}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp validate_special(_move, _board, _turn, _history), do: :ok
 
+  defp resolve_special(%Move{castle: side} = move, board, turn, history) when not is_nil(side) do
+    case validate_castling(move, board, turn, history) do
+      :ok ->
+        {row, _} = move.from
 
-  defp validate_castling(move, board, turn, history) do
+        rook_move =
+          case side do
+            :kingside -> %Move{from: {row, :h}, to: {row, :f}}
+            :queenside -> %Move{from: {row, :a}, to: {row, :d}}
+          end
 
+        {:ok, [move, rook_move]}
+
+      {:error, reason} -> {:error, reason}
+    end
   end
+
+  # Placeholder for future special cases
+  defp resolve_special(move, _board, _turn, _history), do: {:ok, [move]}
+
+  ## validate castling from game perspective
+  ## Neither the king nor the rook involved has moved yet in the game.
+  ## The king does not move through a square that is attacked by an opponent's piece.
+defp validate_castling(%Move{castle: side, from: {row, :e}, piece: piece}, board, _turn, history)
+     when not is_nil(side) and piece in [:k, :K] do
+
+  {color, rook_piece} =
+    case piece do
+      :k -> {:white, :r}
+      :K -> {:black, :R}
+    end
+
+  rook_col = if side == :kingside, do: :h, else: :a
+  rook_pos = {row, rook_col}
+
+  if has_moved_before?({row, :e}, history) or has_moved_before?(rook_pos, history) do
+    {:error, :moved_before}
+  else
+      path = case side do
+        :kingside -> [{row, :f}, {row, :g}]
+        :queenside -> [{row, :d}, {row, :c}]
+      end
+
+      squares_to_check = [{row, :e} | path]
+      opponent = opposite(color)
+
+      if Enum.any?(squares_to_check, fn pos ->
+            PiecesLib.square_attacked?(pos, board, opponent)
+          end) do
+        {:error, :in_check_or_through_check}
+      else
+        :ok
+      end
+  end
+end
+
+defp validate_castling(_move, _board, _turn, _history), do: :ok
+
+
   def history(%Game{history: history}), do: Enum.reverse(history)
 
   @doc """
