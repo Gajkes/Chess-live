@@ -5,10 +5,20 @@
 
 /* This file is for your main application CSS */
 .chessboard {
+  display: grid;
+  grid-template-columns: repeat(8, 80px);
+  grid-template-rows: repeat(8, 80px);
+  width: 640px;
+  height: 640px;
+  border: 1px solid black;
+}
+
+.square {
+  width: 80px;
+  height: 80px;
   display: flex;
-  flex-direction: column;
-  width: 800px;
-  gap: 0px; /* or use Tailwind gap-0 */
+  align-items: center;
+  justify-content: center;
 }
 
 .row {

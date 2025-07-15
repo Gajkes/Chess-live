@@ -20,20 +20,18 @@ defmodule Chess.Game do
 
     square_from = %Square{piece: piece} = Map.get(board.squares, {row,col})
     move = %Move{move | piece: piece}
+    IO.inspect(move, label: "move from client")
 
     with :ok <- validate_turn(turn, move),
          {:ok, move} <- resolve_move(square_from, move, board),
-         {:ok, moves} <- validate_special(move, board, turn, history),
-         :ok <- king_safe_all?(moves, board, turn),
-         {:ok, new_board} <- Board.apply_moves(board, moves)
+         result <- validate_special(move, board, turn, history),
+         {:ok, action} <- handle_move(result, game, turn)
 
          do
-          %Game{
-            game
-            | board: new_board,
-              turn: opposite(turn),
-              history: [move | history]
-          }
+          case action do
+            %Game{} = updated_game -> updated_game
+            {:promotion_pending, move} -> {:promotion_pending, move}
+          end
     else
       {:error, reason} ->
         IO.inspect(reason)
@@ -41,6 +39,30 @@ defmodule Chess.Game do
     end
   end
 
+  defp handle_move({:ok, moves}, %Game{board: board} = game, turn) do
+    with :ok <- king_safe_all?(moves, board, turn),
+         {:ok, new_board} <- Board.apply_moves(board, moves) do
+      {:ok,
+       %Game{
+         game
+         | board: new_board,
+           turn: opposite(turn),
+           history: moves ++ game.history
+       }}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp handle_move({:promotion_pending, move}, %Game{board: board} = _game, turn) do
+    with :ok <- king_safe_all?([move], board, turn) do
+      {:ok, {:promotion_pending, move}}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp handle_move({:error, reason}, _game, _turn), do: {:error, reason}
 
   def board(%Game{board: board}), do: board
 
@@ -51,7 +73,7 @@ defmodule Chess.Game do
   defp opposite(:white), do: :black
   defp opposite(:black), do: :white
 
-  defp resolve_move(square_from = %Square{piece: piece}, %Move{from: from, to: to}, board) do
+  defp resolve_move(square_from = %Square{piece: piece}, %Move{from: from, to: to, promotion: promo}, board) do
     all_moves =
       [&Piece.moves/2, &Piece.attacks/2]
       |> Enum.flat_map(fn check_fun -> check_fun.(square_from, board) end)
@@ -62,10 +84,16 @@ defmodule Chess.Game do
       nil ->
         IO.puts("resolve_move {:error, :illegal_move}")
         {:error, :illegal_move}
-      move ->
-        updated_move = %Move{move | piece: piece}
-        IO.inspect(updated_move, label: "resolve_move {:ok, move}")
-        {:ok, updated_move}
+        legal_move ->
+          updated_move =
+            %Move{
+              legal_move
+              | piece: piece,
+                promotion: promo || legal_move.promotion
+            }
+
+          IO.inspect(updated_move, label: "resolve_move {:ok, updated_move}")
+          {:ok, updated_move}
     end
   end
 
@@ -94,11 +122,12 @@ defmodule Chess.Game do
   defp validate_special(move, board, turn, history)  do
     case resolve_special(move, board, turn, history) do
       {:ok, moves} -> {:ok, moves}
+      {:promotion_pending, move} -> {:promotion_pending, move}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  defp validate_special(_move, _board, _turn, _history), do: :ok
+  defp validate_special(move, _board, _turn, _history), do: {:ok, [move]}
 
   defp resolve_special(%Move{castle: side} = move, board, turn, history) when not is_nil(side) do
     case validate_castling(move, board, turn, history) do
@@ -117,8 +146,33 @@ defmodule Chess.Game do
     end
   end
 
-  # Placeholder for future special cases
+  #pawn promotion
+  defp resolve_special(%Move{piece: :p, to: {8, _}} = move, _board, _turn, _history) do
+    handle_promotion(move, :white)
+  end
+
+  defp resolve_special(%Move{piece: :P, to: {1, _}} = move, _board, _turn, _history) do
+    handle_promotion(move, :black)
+  end
+
+
   defp resolve_special(move, _board, _turn, _history), do: {:ok, [move]}
+
+  defp handle_promotion(%Move{promotion: nil} = move, _color) do
+    {:promotion_pending, move}
+  end
+
+  defp handle_promotion(%Move{promotion: piece} = move, :white)
+       when piece in [:q, :r, :b, :n] do
+    {:ok, [%Move{move | piece: piece}]}
+  end
+
+  defp handle_promotion(%Move{promotion: piece} = move, :black)
+       when piece in [:Q, :R, :B, :N] do
+    {:ok, [%Move{move | piece: piece}]}
+  end
+
+  defp handle_promotion(_move, _), do: {:error, :invalid_promotion_choice}
 
   ## validate castling from game perspective
   ## Neither the king nor the rook involved has moved yet in the game.

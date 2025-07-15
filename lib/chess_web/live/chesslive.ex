@@ -7,29 +7,46 @@ defmodule ChessWeb.Chesslive do
   alias Chess.Square
 
 
-  def mount(params, session, socket) do
+  def mount(_params, _session, socket) do
     game = Game.new()
-    {:ok, assign(socket, %{game: game, clicked_square: {nil,nil}})}
+
+    {:ok,
+     assign(socket, %{
+       game: game,
+       clicked_square: {nil, nil},
+       pending_promotion: nil
+     })}
   end
 
-  def render(%{game: game} = assigns) do
-    # %Board{squares: board} = game.board
-
-    # IO.inspect(Map.get(board,{1,:a}), label: "square 1-a")
-    # IO.inspect(Map.get(board,{3,:a}), label: "square 3-a")
-
+  def render(%{game: game, clicked_square: clicked, pending_promotion: promotion} = assigns) do
     ~H"""
-    <div class="chessboard">
-      <%= for row <- 1..8 do %>
-        <div class="row flex">
-          <%= for {col, col_index} <- Enum.with_index([:a, :b, :c, :d, :e, :f, :g, :h], 1) do  %>
-            <.square square = {Map.get(@game.board.squares,{row,col})} row_index={row} col_index={col_index} key={"#{row}-#{col}"} />
+    <div class="flex flex-col items-center space-y-6 mt-10">
+      <div class="chessboard">
+        <%= for row <- 1..8, col <- [:a, :b, :c, :d, :e, :f, :g, :h] do %>
+          <.square square={Map.get(@game.board.squares, {row, col})} row_index={row} col_index={Chess.Pieces.PiecesLib.col_to_index(col) + 1} />
+        <% end %>
+      </div>
+
+      <%= if @pending_promotion do %>
+        <div class="p-4 bg-white border rounded shadow flex flex-col items-center">
+          <h3 class="mb-2 font-bold text-lg">Choose a piece to promote to:</h3>
+          <div class="flex gap-3">
+            <%= for piece <- promotion_options(@pending_promotion.piece) do %>
+              <button
+                phx-click="promote"
+                phx-value-piece={piece}
+                class="w-[65px] h-[65px] border rounded hover:scale-105 transition"
+              >
+                <.piece piece={piece} class="w-[65px] h-[65px]" />
+              </button>
             <% end %>
+          </div>
         </div>
       <% end %>
     </div>
     """
   end
+
 
   attr(:piece, :atom)
   attr(:class, :string, default: "")
@@ -46,42 +63,69 @@ defmodule ChessWeb.Chesslive do
   end
 
   attr(:square, Square)
-  attr(:click_type, :atom, values: [:select,:move])
-  attr( :row_index, :integer, required: true)
-  attr( :col_index, :integer, required: true)
+  attr(:row_index, :integer, required: true)
+  attr(:col_index, :integer, required: true)
+
   def square(assigns) do
-    color = if rem(assigns.row_index + assigns.col_index, 2) == 0, do: "bg-gray-800", else: "bg-red"
+    color =
+      if rem(assigns.row_index + assigns.col_index, 2) == 0,
+        do: "bg-[#1d2939]", # dark square
+        else: "bg-white"
+
     assigns = assign(assigns, :color, color)
 
     ~H"""
     <div
-      class={[
-                "square w-[80px] h-[80px] flex items-center justify-center", @color
-              ]}
+      class={["square", @color]}
       phx-click="square-click"
-      phx-value-column = {@square.column}
-      phx-value-row = {@square.row}
+      phx-value-column={@square.column}
+      phx-value-row={@square.row}
     >
-    <%= if @square.piece do %>
-      <.piece piece={@square.piece} class="w-[65px] h-[65px] mt-[1.5px]" />
-    <% end %>
+      <%= if @square.piece do %>
+        <.piece piece={@square.piece} class="w-[65px] h-[65px]" />
+      <% end %>
     </div>
     """
   end
 
-  def handle_event("square-click", %{"column" => column, "row" => row}, socket) do
 
-    ##check if this is possible to make move here?
-    ##if new piece is clicked change clicked piece
-    old_clicked_square = socket.assigns.clicked_square
-    old_game = socket.assigns.game
-    column = String.to_atom(column)
+
+  def handle_event("square-click", %{"column" => col, "row" => row}, socket) do
+    column = String.to_atom(col)
     row = String.to_integer(row)
-    if  old_clicked_square != {nil, nil} do
-        new_game = Game.move(old_game, %Move{from: old_clicked_square, to: {row, column}}) #TODO move this if to pattern matching #TODO bug with clicked square
-        {:noreply, assign(socket, %{game: new_game , clicked_square: {nil, nil}})}
-    else
-      {:noreply, assign(socket, %{game: socket.assigns.game , clicked_square: {row, column}})}
+    game = socket.assigns.game
+    clicked = socket.assigns.clicked_square
+
+    case clicked do
+      {nil, nil} ->
+        {:noreply, assign(socket, clicked_square: {row, column})}
+
+      from ->
+        case Game.move(game, %Move{from: from, to: {row, column}}) do
+          %Game{} = updated_game ->
+            {:noreply, assign(socket, game: updated_game, clicked_square: {nil, nil})}
+
+          {:promotion_pending, move} ->
+            {:noreply, assign(socket, pending_promotion: move, clicked_square: {nil, nil})}
+
+          _ ->
+            {:noreply, assign(socket, clicked_square: {nil, nil})}
+        end
+    end
+  end
+
+  def handle_event("promote", %{"piece" => raw_piece}, socket) do
+    move = socket.assigns.pending_promotion
+    piece = String.to_existing_atom(raw_piece)
+
+    case Game.move(socket.assigns.game, %Move{move | promotion: piece}) do
+      %Game{} = updated_game ->
+        IO.puts("here1")
+        {:noreply, assign(socket, game: updated_game, pending_promotion: nil)}
+
+      _ ->
+        IO.puts("here2")
+        {:noreply, socket}
     end
   end
 
@@ -103,6 +147,10 @@ defmodule ChessWeb.Chesslive do
   def piece_name(:k), do: "piece-white-king"
   def piece_name(:K), do: "piece-black-king"
   def piece_name(nil), do: ""
+
+  defp promotion_options(:p), do: [:q, :r, :b, :n]
+  defp promotion_options(:P), do: [:Q, :R, :B, :N]
+  defp promotion_options(_), do: []
 
 
 end
