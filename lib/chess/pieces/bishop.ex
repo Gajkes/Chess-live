@@ -9,17 +9,20 @@ defmodule Chess.Pieces.Bishop do
   @impl true
   def moves(%Square{loc: loc} = square, %Board{squares: squares}) do
     directions = [
-      {1, 1},   # down-right
-      {-1, -1}, # up-left
-      {-1, 1},  # up-right
-      {1, -1}   # down-left
+      # down-right
+      {1, 1},
+      # up-left
+      {-1, -1},
+      # up-right
+      {-1, 1},
+      # down-left
+      {1, -1}
     ]
 
     generate_all_paths(square.loc, directions)
     |> MoveBuilder.build_moves(square, squares)
-
   end
 
   @impl true
-  def attacks(square, board), do: moves(square, board)
+  def attacks(square, board), do: moves(square, board) |> Enum.filter(& &1.capture)
 end

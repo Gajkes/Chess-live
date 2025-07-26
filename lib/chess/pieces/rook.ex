@@ -1,5 +1,3 @@
-
-
 defmodule Chess.Pieces.Rook do
   @behaviour Chess.Piece
 
@@ -19,13 +17,11 @@ defmodule Chess.Pieces.Rook do
         {0, -1},
         {0, 1}
       ]
+
     generate_all_paths(square.loc, directions)
     |> MoveBuilder.build_moves(square, squares)
   end
 
-
   @impl true
-  def attacks(square, board), do: moves(square, board)
-
-
+  def attacks(square, board), do: moves(square, board) |> Enum.filter(& &1.capture)
 end

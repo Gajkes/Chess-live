@@ -1,6 +1,3 @@
-import Chess.Piece
-
-
 defmodule Chess.Move do
   defstruct from: {},
             to: {},
@@ -9,7 +6,4 @@ defmodule Chess.Move do
             promotion: nil,
             castle: nil,
             en_passant: nil
-            # checking: nil
-
-
 end

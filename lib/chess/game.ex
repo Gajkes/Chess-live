@@ -37,6 +37,12 @@ defmodule Chess.Game do
     end
   end
 
+  def possible_moves(%Game{board: board} = game, {row, col}) do
+    square = %Square{} = Map.get(board.squares, {row, col})
+
+    {Piece.moves(square, board) |> List.flatten(), Piece.attacks(square, board) |> List.flatten()}
+  end
+
   defp handle_move({:ok, moves}, %Game{board: board} = game, turn) do
     with :ok <- king_safe_all?(moves, board, turn),
          {:ok, new_board} <- Board.apply_moves(board, moves) do
@@ -66,6 +72,7 @@ defmodule Chess.Game do
 
   defp validate_turn(:white, %Move{piece: p}) when p in [:p, :n, :b, :r, :q, :k], do: :ok
   defp validate_turn(:black, %Move{piece: p}) when p in [:P, :N, :B, :R, :Q, :K], do: :ok
+  # TODO there is a bug
   defp validate_turn(_, _), do: {:error, :wrong_turn}
 
   defp opposite(:white), do: :black
@@ -132,15 +139,22 @@ defmodule Chess.Game do
     end
   end
 
-  defp resolve_special(%Move{castle: side} = move, board, turn, history) when not is_nil(side) do
+  defp resolve_special(%Move{castle: side, piece: piece} = move, board, turn, history)
+       when not is_nil(side) do
     case validate_castling(move, board, turn, history) do
       :ok ->
         {row, _} = move.from
 
+        rook_piece =
+          case piece do
+            :k -> :r
+            :K -> :R
+          end
+
         rook_move =
           case side do
-            :kingside -> %Move{from: {row, :h}, to: {row, :f}}
-            :queenside -> %Move{from: {row, :a}, to: {row, :d}}
+            :kingside -> %Move{from: {row, :h}, to: {row, :f}, piece: rook_piece}
+            :queenside -> %Move{from: {row, :a}, to: {row, :d}, piece: rook_piece}
           end
 
         {:ok, [move, rook_move]}
@@ -208,7 +222,7 @@ defmodule Chess.Game do
          history
        )
        when not is_nil(side) and piece in [:k, :K] do
-    {color, _} =
+    {color, rook} =
       case piece do
         :k -> {:white, :r}
         :K -> {:black, :R}

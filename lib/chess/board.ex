@@ -11,6 +11,7 @@ defmodule Chess.Board do
     initiate_board()
   end
 
+  # TODO refactor this xd
   def apply_move(%Board{squares: squares} = board, %Move{} = move) do
     {:ok, {piece, squares_after_removal}} = remove_piece(squares, move)
     {_capture_orok, squares_after_move} = place_piece(squares_after_removal, move, piece)
@@ -47,15 +48,14 @@ defmodule Chess.Board do
 
   defp place_piece(
          squares,
-         %Move{to: {row_to, col_to}, piece: p, en_passant: en_passant_status},
-         piece
+         %Move{
+           to: {row_to, col_to},
+           piece: p
+         },
+         _piece
        ) do
     case Map.get_and_update(squares, {row_to, col_to}, fn current ->
-           case en_passant_status do
-             # should be nil
-             :captured -> {current, %Square{current | piece: p}}
-             _ -> {current, %Square{current | piece: piece}}
-           end
+           {current, %Square{current | piece: p}}
          end) do
       {%Square{}, squares_after_move} -> {:ok, squares_after_move}
     end

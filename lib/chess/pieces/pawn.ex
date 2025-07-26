@@ -10,7 +10,7 @@ defmodule Chess.Pieces.Pawn do
 
   # white pawn
   @impl true
-  def moves(%Square{row: 2} = square, %Board{squares: squares}) do
+  def moves(%Square{row: 2, piece: :p} = square, %Board{squares: squares}) do
     # Try one-step forward first
     single_moves =
       generate_all_paths(square.loc, [{1, 0}], 1)
@@ -59,7 +59,7 @@ defmodule Chess.Pieces.Pawn do
     |> Enum.filter(fn %Move{capture: capture} -> not capture end)
   end
 
-  def moves(%Square{row: 7} = square, %Board{squares: squares}) do
+  def moves(%Square{row: 7, piece: :P} = square, %Board{squares: squares}) do
     single_moves =
       generate_all_paths(square.loc, [{-1, 0}], 1)
       |> MoveBuilder.build_moves(square, squares)
