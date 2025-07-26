@@ -22,7 +22,7 @@ defmodule ChessWeb.Chesslive do
     ~H"""
     <div class="flex flex-col items-center space-y-6 mt-10">
       <div class="chessboard">
-        <%= for row <- 1..8, col <- [:a, :b, :c, :d, :e, :f, :g, :h] do %>
+        <%= for row <- 8..1, col <- [:a, :b, :c, :d, :e, :f, :g, :h] do %>
           <.square square={Map.get(@game.board.squares, {row, col})} row_index={row} col_index={Chess.Pieces.PiecesLib.col_to_index(col) + 1} />
         <% end %>
       </div>
@@ -69,7 +69,7 @@ defmodule ChessWeb.Chesslive do
   def square(assigns) do
     color =
       if rem(assigns.row_index + assigns.col_index, 2) == 0,
-        do: "bg-[#1d2939]", # dark square
+        do: "bg-[#a9745d]", # dark square
         else: "bg-white"
 
     assigns = assign(assigns, :color, color)

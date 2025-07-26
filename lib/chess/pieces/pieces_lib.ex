@@ -1,5 +1,5 @@
 defmodule Chess.Pieces.PiecesLib do
-  alias Chess.Square
+  alias Chess.Move
   @columns [:a, :b, :c, :d, :e, :f, :g, :h]
   @col_to_index Enum.with_index(@columns) |> Map.new()
   @index_to_col Enum.with_index(@columns) |> Enum.into(%{}, fn {col, i} -> {i, col} end)
@@ -41,7 +41,9 @@ defmodule Chess.Pieces.PiecesLib do
   # end
   def square_attacked?(target_pos, %Chess.Board{squares: squares} = board, attacker_color) do
     Enum.any?(squares, fn
-      {_pos, %Chess.Square{piece: nil}} -> false
+      {_pos, %Chess.Square{piece: nil}} ->
+        false
+
       {_pos, %Chess.Square{piece: p} = square} ->
         color_of(p) == attacker_color and
           Enum.any?(Chess.Piece.attacks(square, board), fn
@@ -51,4 +53,12 @@ defmodule Chess.Pieces.PiecesLib do
     end)
   end
 
+  def get_en_passant_captured_pawn_pos(%Move{to: {to_row, to_col}}, turn) do
+    case turn do
+      # Captured pawn is one row below
+      :white -> {to_row - 1, to_col}
+      # Captured pawn is one row above
+      :black -> {to_row + 1, to_col}
+    end
+  end
 end

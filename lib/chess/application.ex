@@ -9,7 +9,7 @@ defmodule Chess.Application do
   def start(_type, _args) do
     children = [
       ChessWeb.Telemetry,
-      Chess.Repo,
+      #Chess.Repo,
       {DNSCluster, query: Application.get_env(:chess, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Chess.PubSub},
       # Start the Finch HTTP client for sending emails
