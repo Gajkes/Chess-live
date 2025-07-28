@@ -37,10 +37,38 @@ defmodule Chess.Game do
     end
   end
 
-  def possible_moves(%Game{board: board} = game, {row, col}) do
-    square = %Square{} = Map.get(board.squares, {row, col})
+  def possible_moves(%Game{board: board, turn: turn, history: history}, {row, col}) do
+    # TODO maybe do better this function and move function duplicate code?
+    square = %Square{piece: p} = Map.get(board.squares, {row, col})
 
-    {Piece.moves(square, board) |> List.flatten(), Piece.attacks(square, board) |> List.flatten()}
+    with :ok <- validate_turn(turn, p) do
+      normal_moves =
+        Piece.moves(square, board)
+        |> List.flatten()
+        |> Enum.filter(fn %Move{} = move ->
+          move = %Move{move | piece: p}
+
+          case {validate_special(move, board, turn, history), king_safe_all?(move, board, turn)} do
+            {{:ok, _}, :ok} -> true
+            _ -> false
+          end
+        end)
+
+      attack_moves =
+        Piece.attacks(square, board)
+        |> List.flatten()
+        |> Enum.filter(fn attack_move ->
+          case king_safe_all?(attack_move, board, turn) do
+            :ok -> true
+            _ -> false
+          end
+        end)
+
+      {normal_moves, attack_moves}
+    else
+      _ ->
+        {[], []}
+    end
   end
 
   defp handle_move({:ok, moves}, %Game{board: board} = game, turn) do
@@ -72,6 +100,8 @@ defmodule Chess.Game do
 
   defp validate_turn(:white, %Move{piece: p}) when p in [:p, :n, :b, :r, :q, :k], do: :ok
   defp validate_turn(:black, %Move{piece: p}) when p in [:P, :N, :B, :R, :Q, :K], do: :ok
+  defp validate_turn(:white, p) when p in [:p, :n, :b, :r, :q, :k], do: :ok
+  defp validate_turn(:black, p) when p in [:P, :N, :B, :R, :Q, :K], do: :ok
   # TODO there is a bug
   defp validate_turn(_, _), do: {:error, :wrong_turn}
 
@@ -109,6 +139,8 @@ defmodule Chess.Game do
         {:ok, updated_move}
     end
   end
+
+  defp king_safe_all?(%Move{} = move, board, color), do: king_safe_all?([move], board, color)
 
   defp king_safe_all?(moves, board, color) do
     case Board.apply_moves(board, moves) do
