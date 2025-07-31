@@ -4,6 +4,7 @@ defmodule ChessWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug :put_player_id
     plug :fetch_live_flash
     plug :put_root_layout, html: {ChessWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -17,7 +18,8 @@ defmodule ChessWeb.Router do
   scope "/", ChessWeb do
     pipe_through :browser
 
-    live "/chess", Chesslive
+    live "/game/:game_id", Chesslive
+    live "/game", Chesslive
   end
 
   # Other scopes may use custom stacks.
@@ -39,6 +41,17 @@ defmodule ChessWeb.Router do
 
       live_dashboard "/dashboard", metrics: ChessWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
+    end
+  end
+
+  defp put_player_id(conn, _opts) do
+    case get_session(conn, :player_id) do
+      nil ->
+        player_id = :crypto.strong_rand_bytes(8) |> Base.encode64()
+        put_session(conn, :player_id, player_id)
+
+      _ ->
+        conn
     end
   end
 end
