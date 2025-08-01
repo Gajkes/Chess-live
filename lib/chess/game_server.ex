@@ -138,8 +138,6 @@ defmodule Chess.GameServer do
   end
 
   defp get_game_status(game) do
-    # You'll need to implement these functions in your Game module
-    # or adapt this to your existing game state checking
     cond do
       Game.checkmate?(game) -> "checkmate"
       Game.check?(game) -> "check"

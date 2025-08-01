@@ -4,7 +4,6 @@ defmodule Chess.Pieces.PiecesLib do
   @col_to_index Enum.with_index(@columns) |> Map.new()
   @index_to_col Enum.with_index(@columns) |> Enum.into(%{}, fn {col, i} -> {i, col} end)
 
-  # === Column Helpers ===
   def col_to_index(col), do: Map.get(@col_to_index, col)
   def index_to_col(i), do: Map.get(@index_to_col, i)
 
@@ -13,7 +12,6 @@ defmodule Chess.Pieces.PiecesLib do
     Enum.at(@columns, index + offset)
   end
 
-  # === Raw Path Generator ===
   def generate_paths({row, col}, {dr, dc}, max_steps \\ 8) do
     col_index = col_to_index(col)
 
@@ -35,10 +33,7 @@ defmodule Chess.Pieces.PiecesLib do
   def is_enemy?(nil, _), do: false
   def is_enemy?(_, nil), do: false
   def is_enemy?(a, b), do: color_of(a) != color_of(b)
-  # === General Utilities ===
-  # def valid_squares(path) do
-  #   Enum.filter(path, fn {r, c_index} -> r in 1..8 and c_index in 0..7 end)
-  # end
+
   def square_attacked?(target_pos, %Chess.Board{squares: squares} = board, attacker_color) do
     Enum.any?(squares, fn
       {_pos, %Chess.Square{piece: nil}} ->
